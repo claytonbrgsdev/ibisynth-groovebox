@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Creative Systems Portfolio",
+  "description": "An interactive digital portfolio designed with a functional, toy-like tactile aesthetic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
