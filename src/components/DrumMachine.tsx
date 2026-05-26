@@ -13,7 +13,7 @@ import {
 } from "../lib/audio";
 import { P5Wrapper } from "./P5Wrapper";
 import Knob from "./Knob";
-import { resonanceFieldSketch } from "../sketches/resonanceField";
+import { resonantTopologySketch } from "../sketches/resonantTopology";
 
 // ── Track constants ───────────────────────────────────────────────────────────
 const INSTRUMENTS = ["KICK", "SNARE", "HIHAT", "CLAP"];
@@ -519,9 +519,78 @@ export const DrumMachine = () => {
         </div>
       </div>
 
-      {/* ─── RIGHT PANEL — resonance field visualization (58%) ─── */}
-      <div className="flex-1 relative overflow-hidden">
-        <P5Wrapper sketch={resonanceFieldSketch} className="w-full h-full" />
+      {/* ─── RIGHT PANEL — hero composition (identity + vis + CTA) ─── */}
+      <div className="flex-1 relative overflow-hidden flex flex-col">
+
+        {/* Identity hero — top of right panel */}
+        <div className="relative z-10 px-8 pt-7 pb-5 shrink-0">
+          <h1
+            className="text-[var(--ib-text)] leading-[0.95]"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 200,
+              fontSize: "clamp(28px, 3.4vw, 46px)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Clayton Borges
+          </h1>
+
+          <div className="flex items-baseline gap-3 mt-2 flex-wrap">
+            <span
+              className="text-[var(--ib-accent)]"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+              }}
+            >
+              Creative / Full-Stack Developer
+            </span>
+            <span
+              className="text-[var(--ib-muted)]"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "0.04em",
+              }}
+            >
+              · React · Next.js · Three.js · Python · Ruby
+            </span>
+          </div>
+        </div>
+
+        {/* Vis canvas — fills remaining space */}
+        <div className="flex-1 relative overflow-hidden min-h-0">
+          <P5Wrapper sketch={resonantTopologySketch} className="w-full h-full absolute inset-0" />
+        </div>
+
+        {/* CTA prompt — bottom of right panel */}
+        <div className="relative z-10 px-8 pb-5 pt-3 shrink-0 flex items-center justify-between">
+          <span
+            className="text-[var(--ib-muted)]"
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "9px",
+              textTransform: "uppercase",
+              letterSpacing: "0.3em",
+            }}
+          >
+            but first — hit play · turn a knob
+          </span>
+          <span
+            className="text-[var(--ib-muted)] opacity-60"
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "9px",
+              textTransform: "uppercase",
+              letterSpacing: "0.3em",
+            }}
+          >
+            scroll ↓
+          </span>
+        </div>
       </div>
     </section>
   );
