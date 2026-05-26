@@ -6,10 +6,10 @@ import { getAudioTime, visualEvents } from '../lib/audio';
 export const placeholderSketch1 = (p: any) => {
   const COLS = 5;
   const ROWS = 4;
-  const BG    = [242, 242, 240] as const;
-  const DARK  = [17, 17, 17]   as const;
-  const GRAY  = [122, 122, 122] as const;
-  const ACC   = [224, 222, 216] as const;
+  const BG    = [12, 11, 9] as const;
+  const MUTED = [46, 45, 42] as const;
+  const ACC   = [196, 162, 100] as const;
+  const TEXT  = [230, 224, 212] as const;
 
   // Audio impact values (0→1, decayed each frame)
   let kickImpact  = 0;
@@ -67,10 +67,10 @@ export const placeholderSketch1 = (p: any) => {
     dubImpact   = p.lerp(dubImpact,   0, 0.05);
     for (let s = 0; s < 4; s++) smpImpact[s] = p.lerp(smpImpact[s], 0, 0.10);
 
-    // SNARE → background flips dark
-    const bgR = p.lerp(BG[0], DARK[0], snareImpact);
-    const bgG = p.lerp(BG[1], DARK[1], snareImpact);
-    const bgB = p.lerp(BG[2], DARK[2], snareImpact);
+    // SNARE impact is preserved; palette endpoints are now both IBISYNTH background.
+    const bgR = p.lerp(BG[0], BG[0], snareImpact);
+    const bgG = p.lerp(BG[1], BG[1], snareImpact);
+    const bgB = p.lerp(BG[2], BG[2], snareImpact);
     p.background(bgR, bgG, bgB);
 
     const cellW  = p.width  / COLS;
@@ -100,27 +100,27 @@ export const placeholderSketch1 = (p: any) => {
         const phase = t * 0.4 + (col * 0.7 + row * 1.1) * 0.5 + hihatPhaseOffset;
         const r     = baseR + kickRBoost + colSmp * baseR * 0.28;
 
-        const noise     = p.noise(col * 0.4, row * 0.4, t * 0.1);
-        let   baseAlpha = p.map(noise, 0, 1, 100, 220);
-        baseAlpha       = p.lerp(baseAlpha, 255, p.max(snareImpact, colSmp));
-
-        // Stroke palette — SNARE flips to white; SMP boosts accent; normal palette
-        const palIdx = (col + row) % 3;
-        const basePal = palIdx === 0 ? DARK : palIdx === 1 ? GRAY : ACC;
-        const flashPal = snareImpact > colSmp
-          ? [255, 255, 255] as const
-          : [ACC[0], ACC[1], ACC[2]] as const;
-        const blendT = p.max(snareImpact, colSmp);
-        const strokeR = p.lerp(basePal[0], flashPal[0], blendT);
-        const strokeG = p.lerp(basePal[1], flashPal[1], blendT);
-        const strokeB = p.lerp(basePal[2], flashPal[2], blendT);
-
+        const noise = p.noise(col * 0.4, row * 0.4, t * 0.1);
         const baseWeight = p.map(noise, 0, 1, 0.5, 1.5);
-        p.stroke(strokeR, strokeG, strokeB, baseAlpha);
-        p.strokeWeight(baseWeight * clapWeightMult * (1 + colSmp * 1.5));
-
-        p.beginShape();
+        const curveWeight = baseWeight * clapWeightMult * (1 + colSmp * 1.5);
         const steps = 120;
+
+        // Glow/trail pass.
+        p.stroke(ACC[0], ACC[1], ACC[2], 38);
+        p.strokeWeight(curveWeight * 2.2);
+        p.beginShape();
+        for (let i = 0; i <= steps; i++) {
+          const theta = (i / steps) * p.TWO_PI;
+          const x = cx + r * p.sin(a * theta + phase);
+          const y = cy + r * p.sin(b * theta);
+          p.vertex(x, y);
+        }
+        p.endShape(p.CLOSE);
+
+        // Main curve pass.
+        p.stroke(ACC[0], ACC[1], ACC[2], 217);
+        p.strokeWeight(curveWeight);
+        p.beginShape();
         for (let i = 0; i <= steps; i++) {
           const theta = (i / steps) * p.TWO_PI;
           const x = cx + r * p.sin(a * theta + phase);
@@ -137,22 +137,19 @@ export const placeholderSketch1 = (p: any) => {
         const dotSize = 3.5 + kickImpact * 4 + colSmp * 5;
 
         p.noStroke();
-        if (snareImpact > 0.01) {
-          p.fill(255, 255, 255, p.lerp(200, 255, snareImpact));
-        } else if (colSmp > 0.01) {
-          p.fill(ACC[0], ACC[1], ACC[2], p.lerp(200, 255, colSmp));
+        if (snareImpact > 0.01 || colSmp > 0.01) {
+          p.fill(TEXT[0], TEXT[1], TEXT[2], p.lerp(200, 255, p.max(snareImpact, colSmp)));
         } else {
-          p.fill(DARK[0], DARK[1], DARK[2], 200);
+          p.fill(TEXT[0], TEXT[1], TEXT[2], 200);
         }
         p.circle(dotX, dotY, dotSize);
         p.noFill();
       }
     }
 
-    // Grid overlay — BASS pulses it brighter
-    const gridAlpha  = p.lerp(18, 90, bassImpact);
+    // Grid overlay / panel framing
     const gridWeight = p.lerp(0.5, 2.5, bassImpact);
-    p.stroke(DARK[0], DARK[1], DARK[2], gridAlpha);
+    p.stroke(MUTED[0], MUTED[1], MUTED[2], 153);
     p.strokeWeight(gridWeight);
     for (let col = 1; col < COLS; col++) {
       p.line(col * cellW, 0, col * cellW, p.height);
@@ -160,5 +157,10 @@ export const placeholderSketch1 = (p: any) => {
     for (let row = 1; row < ROWS; row++) {
       p.line(0, row * cellH, p.width, row * cellH);
     }
+
+    p.stroke(MUTED[0], MUTED[1], MUTED[2], 204);
+    p.strokeWeight(1.2);
+    p.noFill();
+    p.rect(0, 0, p.width, p.height);
   };
 };

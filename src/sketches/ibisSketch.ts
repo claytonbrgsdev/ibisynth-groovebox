@@ -117,21 +117,25 @@ export const ibisSketch = (p: any) => {
     clapImpact = p.lerp(clapImpact, 0, 0.15);
 
     // Weather / Echo (Dry/Wet) State
-    // Default dry (0): bright blue sky, 1 cloud, sun/moon normal bright
-    // Wet (0.9): dark purple sky, raining, water level rising, lots of clouds
     let weatherP = p.constrain(dubDecayCurrent / 0.9, 0, 1);
 
     // 1. SKY & BACKGROUND
-    let drySkyColor = p.color(242, 242, 240); // Light
-    let wetSkyColor = p.color(42, 42, 42); // Darker grey
-    let flashColor = p.color(224, 222, 216); // Accent flash
+    let drySkyColor = p.color(12, 11, 9);
+    let wetSkyColor = p.color(26, 24, 16);
+    let bassFlashColor = p.color(196, 162, 100, 15);
 
     let currentSkyColor = p.lerpColor(drySkyColor, wetSkyColor, weatherP);
-    let baseBg = p.lerpColor(currentSkyColor, flashColor, bassImpact);
-    
-    // Magenta flash on CLAP
-    let magentaColor = p.color(255, 0, 255); // Magenta
-    p.background(p.lerpColor(baseBg, magentaColor, clapImpact));
+    let baseBg = p.lerpColor(currentSkyColor, bassFlashColor, bassImpact);
+    let clapFlashColor = p.color(196, 162, 100, 20);
+    p.background(p.lerpColor(baseBg, clapFlashColor, clapImpact));
+
+    // Wet weather darkens the sky with a subtle overlay.
+    p.push();
+    p.rectMode(p.CORNER);
+    p.noStroke();
+    p.fill(8, 7, 6, 60 * weatherP);
+    p.rect(0, 0, p.width, p.height);
+    p.pop();
 
     let gTime = p.millis() * 0.001;
 
@@ -140,10 +144,13 @@ export const ibisSketch = (p: any) => {
     p.translate(vpX, vpY - p.height * 0.1);
 
     let moonColor = p.lerpColor(
-      p.color(17, 17, 17, 200),
-      p.color(242, 242, 240, 50),
-      weatherP,
+      p.color(196, 162, 100, 40),
+      p.color(196, 162, 100, 50),
+      1 - weatherP,
     );
+    p.fill(196, 162, 100, 40 * (1 - weatherP));
+    p.noStroke();
+    p.circle(0, 0, p.height * 0.35);
     p.fill(moonColor);
     p.noStroke();
 
@@ -160,12 +167,12 @@ export const ibisSketch = (p: any) => {
       p.ellipse(cx, cy - 10 * scale, 40 * scale, 25 * scale);
     };
 
-    let dryCloudColor = p.color(224, 222, 216, 220);
-    let wetCloudColor = p.color(17, 17, 17, 240);
+    let dryCloudColor = p.color(30, 28, 24, 220);
+    let wetCloudColor = p.color(30, 28, 24, 240);
     let currentCloudColor = p.lerpColor(dryCloudColor, wetCloudColor, weatherP);
 
     p.fill(
-      p.lerpColor(currentCloudColor, p.color(242, 242, 240, 220), bassImpact),
+      p.lerpColor(currentCloudColor, p.color(196, 162, 100, 40), bassImpact),
     );
 
     // Always draw cloud 1
@@ -225,7 +232,7 @@ export const ibisSketch = (p: any) => {
 
     // Horizon line / Sand background
     p.rectMode(p.CORNER);
-    p.fill(224, 222, 216); // Sand
+    p.fill(26, 24, 18); // Sand
     p.beginShape();
     p.vertex(0, dynamicVpY);
     let stepsH = 40;
@@ -253,8 +260,8 @@ export const ibisSketch = (p: any) => {
         );
       }
 
-      let waterColor = p.color(122, 122, 122, 220);
-      let waterFlashColor = p.color(242, 242, 240, 200);
+      let waterColor = p.color(14, 13, 10, 220);
+      let waterFlashColor = p.color(196, 162, 100, 26);
       p.fill(p.lerpColor(waterColor, waterFlashColor, bassImpact));
       p.beginShape();
 
@@ -278,7 +285,7 @@ export const ibisSketch = (p: any) => {
         let y = p.lerp(dynamicVpY, p.height, flowP * flowP);
         let leftEdge = p.map(y, dynamicVpY, p.height, vpX, leftEdgeXAtBottom);
         let opacity = p.map(flowP, 0, 1, 0, 150);
-        p.stroke(242, 242, 240, opacity);
+        p.stroke(196, 162, 100, opacity * 0.17);
         p.noFill();
         p.beginShape();
         let steps = 20;
@@ -303,7 +310,7 @@ export const ibisSketch = (p: any) => {
 
       if (pt.type === "rain") {
         // Rain doesn't fade with time just drops fast
-        p.stroke(242, 242, 240, 150);
+        p.stroke(196, 162, 100, 40);
         p.strokeWeight(1.5);
         p.line(pt.x, pt.y, pt.x - pt.vx * 2, pt.y - pt.vy * 2);
         if (
@@ -322,10 +329,10 @@ export const ibisSketch = (p: any) => {
         } else {
           p.noStroke();
           if (pt.type === "sand") {
-            p.fill(122, 122, 122, pt.life * 255);
+            p.fill(196, 162, 100, 160 * pt.life);
             p.circle(pt.x, pt.y, 4);
           } else {
-            p.fill(242, 242, 240, pt.life * 255);
+            p.fill(196, 162, 100, 130 * pt.life);
             p.circle(pt.x, pt.y, p.random(3, 6)); // sparkling water
           }
         }
@@ -339,7 +346,7 @@ export const ibisSketch = (p: any) => {
     p.push();
     p.translate(birdCenterX, birdCenterY + 100); // Bird feet approximate location
     p.noFill();
-    p.stroke(242, 242, 240, 150 + kickImpact * 100);
+    p.stroke(196, 162, 100, 80);
     p.strokeWeight(1 + kickImpact * 3);
     p.ellipse(-5, 0, 40 + kickImpact * 30, 10 + kickImpact * 5);
     p.pop();
@@ -351,7 +358,7 @@ export const ibisSketch = (p: any) => {
     let yOffset = -kickImpact * 30; // Jump up
     p.translate(0, yOffset);
 
-    let birdColor = p.color(17, 17, 17); // sys-dark
+    let birdColor = p.color(230, 224, 212);
 
     // Physics for tail lag
     let audioTimeThisFrame = getAudioTime();
@@ -373,15 +380,15 @@ export const ibisSketch = (p: any) => {
       // Increase aura size significantly for "ghost" vibe, mapped to delay
       let auraSize = 1.0 + dubImpact * dubDecayCurrent * 0.8;
       p.scale(auraSize);
-      let col = p.color(242, 242, 240, 120 * dubImpact); // Accent
+      let col = p.color(230, 224, 212, 20); // Ghost aura
       p.noFill();
       p.stroke(col);
       // Create a blurred glow effect
       p.strokeWeight(12);
       drawIbis(p, dubImpact, true, col);
       p.strokeWeight(4);
-      p.stroke(242, 242, 240, 200 * dubImpact);
-      drawIbis(p, dubImpact, true, p.color(242, 242, 240));
+      p.stroke(230, 224, 212, 20);
+      drawIbis(p, dubImpact, true, p.color(230, 224, 212, 20));
       p.pop();
     }
 
@@ -395,6 +402,10 @@ export const ibisSketch = (p: any) => {
 
   function drawIbis(p: p5, wobble: number, isGhost: boolean, color: p5.Color) {
     let time = p.millis() * 0.005;
+    let bodyColor = p.color(230, 224, 212);
+    let mutedColor = p.color(46, 45, 42);
+    let accentColor = p.color(196, 162, 100);
+    let darkColor = p.color(12, 11, 9);
 
     const wX = (i: number) =>
       wobble > 0 ? p.sin(time + i * 0.5) * wobble * 15 : 0;
@@ -413,7 +424,7 @@ export const ibisSketch = (p: any) => {
       p.strokeWeight(4);
       p.noFill();
     } else {
-      p.fill(color);
+      p.fill(bodyColor);
       p.noStroke();
     }
 
@@ -423,7 +434,7 @@ export const ibisSketch = (p: any) => {
       p.stroke(color);
       p.strokeWeight(4);
     } else {
-      p.stroke(color);
+      p.stroke(mutedColor);
       p.strokeWeight(3);
     }
 
@@ -495,6 +506,19 @@ export const ibisSketch = (p: any) => {
     }
     p.endShape(p.CLOSE);
 
+    if (!isGhost) {
+      // Darker tail block to separate the back plumage.
+      p.push();
+      p.fill(mutedColor);
+      p.noStroke();
+      p.beginShape();
+      p.vertex(bodyPts[0].x + wX(0), bodyPts[0].y + wY(0));
+      p.vertex(bodyPts[1].x + wX(1), bodyPts[1].y + wY(1));
+      p.vertex(bodyPts[7].x + wX(7), bodyPts[7].y + wY(7));
+      p.endShape(p.CLOSE);
+      p.pop();
+    }
+
     // Neck and Head
     p.push();
     p.translate(22, -22); // Pivot point at neck base
@@ -528,19 +552,30 @@ export const ibisSketch = (p: any) => {
     p.endShape(p.CLOSE);
 
     if (!isGhost) {
+      // Beak overlay in amber.
+      p.push();
+      p.fill(accentColor);
+      p.noStroke();
+      p.beginShape();
+      for (let i = 5; i <= 12; i++) {
+        p.vertex(headPts[i].x + wX(i + 10), headPts[i].y + wY(i + 10));
+      }
+      p.endShape(p.CLOSE);
+      p.pop();
+
       // Skin patch on back of the neck/head
       p.push();
-      p.fill(42, 42, 42); // Darker grey
+      p.fill(46, 45, 42);
       p.noStroke();
       p.ellipse(-6 + wX(12), -65 + wY(12), 8, 12);
       p.ellipse(-2 + wX(13), -75 + wY(13), 7, 7);
-      p.fill(122, 122, 122);
+      p.fill(196, 162, 100);
       p.ellipse(3 + wX(14), -80 + wY(14), 5, 5);
       p.pop();
 
       // Shaggy white neck feathers at the base
       p.push();
-      p.stroke(224, 222, 216);
+      p.stroke(230, 224, 212, 100);
       p.strokeWeight(1.5);
       for (let f = 0; f < 8; f++) {
         let fx = p.random(-8, 12);
@@ -561,11 +596,7 @@ export const ibisSketch = (p: any) => {
         let tipIdx = 8;
         let tipX = headPts[tipIdx].x + wX(tipIdx + 10);
         let tipY = headPts[tipIdx].y + wY(tipIdx + 10);
-        let tipColor = p.lerpColor(
-          p.color(122, 122, 122),
-          p.color(242, 242, 240),
-          filterPct,
-        );
+        let tipColor = p.color(196, 162, 100);
 
         p.noFill();
         p.strokeWeight(3 + glowAmt * 4);
@@ -578,7 +609,7 @@ export const ibisSketch = (p: any) => {
             p.red(tipColor),
             p.green(tipColor),
             p.blue(tipColor),
-            100 * glowAmt,
+            180 * glowAmt,
           ),
         );
         p.point(tipX, tipY);
@@ -610,7 +641,7 @@ export const ibisSketch = (p: any) => {
         p.translate(hlx, hly);
         p.rotate(a);
         p.noFill();
-        p.stroke(255, 150 * p.sin(t * p.PI));
+        p.stroke(230, 224, 212, 40 * p.sin(t * p.PI));
         p.strokeWeight(1.5);
         p.arc(0, -2, 12, 4, p.PI, p.TWO_PI);
       }
@@ -620,7 +651,7 @@ export const ibisSketch = (p: any) => {
     // Eye
     p.push();
     if (!isGhost) {
-      p.fill(242, 242, 240);
+      p.fill(darkColor);
       p.noStroke();
     }
     let eyex = 5 + wX(15);
@@ -640,12 +671,12 @@ export const ibisSketch = (p: any) => {
     p.ellipse(0, 0, baseSize, currentEyeHeight); // White portion
     
     if (!isGhost && !isBlinking) {
-      // Pupil tracking
-      p.fill(17, 17, 17); // Dark pupil
+      // Iris tracking
+      p.fill(accentColor);
       let pupilOffset = 1.0;
       let px = p.cos(angleToMouse) * pupilOffset;
       let py = p.sin(angleToMouse) * pupilOffset;
-      p.ellipse(px, py, baseSize * 0.4, baseSize * 0.4);
+      p.ellipse(px, py, baseSize * 0.45, baseSize * 0.45);
     }
     p.pop();
 
@@ -661,8 +692,8 @@ export const ibisSketch = (p: any) => {
     p.rotate(wingRotation + wingJitter);
 
     if (!isGhost) {
-      p.fill(17, 17, 17);
-      p.stroke(42, 42, 42);
+      p.fill(mutedColor);
+      p.stroke(clapImpact > 0.01 ? bodyColor : mutedColor);
       p.strokeWeight(2);
     }
     p.beginShape();
@@ -683,7 +714,19 @@ export const ibisSketch = (p: any) => {
     p.endShape(p.CLOSE);
 
     if (!isGhost) {
-      p.stroke(42, 42, 42); // subtle feather color
+      p.noFill();
+      p.stroke(230, 224, 212, 40);
+      p.strokeWeight(2);
+      p.beginShape();
+      for (let i = 0; i < wingPts.length; i++) {
+        let pt = wingPts[i];
+        p.vertex(pt.x * 0.82 + wX(i + 20), pt.y * 0.82 + wY(i + 20));
+      }
+      p.endShape(p.CLOSE);
+    }
+
+    if (!isGhost) {
+      p.stroke(230, 224, 212, 100); // feather detail
       p.strokeWeight(1.5);
 
       let windDisplacement = (offset: number) =>

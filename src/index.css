@@ -1,24 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
+
+:root {
+  --ib-bg: #0C0B09;
+  --ib-text: #E6E0D4;
+  --ib-accent: #C4A264;
+  --ib-muted: #2E2D2A;
+  --ib-surface: #141310;
+  --ib-accent-dim: rgba(196, 162, 100, 0.18);
+  --ib-text-dim: rgba(230, 224, 212, 0.45);
+}
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* Teenage Engineering Inspired Monochromatic Colors */
-  --color-sys-bg: #F2F2F0; /* Primary Accent */
-  --color-sys-gray: #7A7A7A; /* Medium gray for readability */
-  --color-sys-dark: #111111; /* Primary Background */
-  --color-sys-surface: #2A2A2A; /* Secondary Surface */
-  --color-sys-magenta: #F2F2F0; /* Replaced vibrant colors */
-  --color-sys-cyan: #E0DED8; /* Secondary Accent */
-  --color-sys-volt: #F2F2F0;
-  --color-sys-green: #E0DED8;
-  --color-sys-orange: #FF6B35;
+  --color-sys-bg: #0C0B09; /* Primary Accent */
+  --color-sys-gray: #2E2D2A; /* Medium gray for readability */
+  --color-sys-dark: #E6E0D4; /* Primary Background */
+  --color-sys-surface: #141310; /* Secondary Surface */
+  --color-sys-magenta: #C4A264; /* Replaced vibrant colors */
+  --color-sys-cyan: rgba(196, 162, 100, 0.6); /* Secondary Accent */
+  --color-sys-volt: #C4A264;
+  --color-sys-green: #2E2D2A;
+  --color-sys-orange: #C4A264;
 }
 
 @layer base {
   body {
-    @apply bg-sys-bg text-sys-dark font-sans antialiased selection:bg-sys-magenta selection:text-sys-dark;
+    background: var(--ib-bg);
+    color: var(--ib-text);
+    font-family: 'JetBrains Mono', monospace;
+    @apply antialiased selection:bg-sys-magenta selection:text-sys-dark;
   }
 }

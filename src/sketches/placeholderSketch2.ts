@@ -1,15 +1,15 @@
 // Placeholder Scene 2: Perlin Flow Field
 // Particles follow a Perlin noise vector field, leaving fading trails.
-// Palette: bg #F2F2F0, dark #111111, gray #7A7A7A, accent #E0DED8
+// Palette: bg #0C0B09, text #E6E0D4, accent #C4A264, muted #2E2D2A
 
 import { getAudioTime, visualEvents } from '../lib/audio';
 
 export const placeholderSketch2 = (p: any) => {
   const PALETTE = {
-    bg: [242, 242, 240],
-    dark: [17, 17, 17],
-    gray: [122, 122, 122],
-    accent: [224, 222, 216],
+    bg: [12, 11, 9],
+    text: [230, 224, 212],
+    accent: [196, 162, 100],
+    muted: [46, 45, 42],
   };
 
   const NUM_PARTICLES = 160;
@@ -135,8 +135,7 @@ export const placeholderSketch2 = (p: any) => {
     const currentFieldScale = FIELD_SCALE * (1 + hihatImpact * 4.0);
 
     // --- Slowly fade the off-screen buffer toward bg ---
-    // DUB reduces fade alpha (trails linger); SNARE increases it (faster clearing).
-    const fadeAlpha = Math.max(2, 18 + snareImpact * 40 - dubImpact * 14);
+    const fadeAlpha = 10;
     frameBuffer.noStroke();
     frameBuffer.fill(PALETTE.bg[0], PALETTE.bg[1], PALETTE.bg[2], fadeAlpha);
     frameBuffer.rect(0, 0, frameBuffer.width, frameBuffer.height);
@@ -196,26 +195,23 @@ export const placeholderSketch2 = (p: any) => {
       // Life alpha: fade in and out
       const lifeRatio = pt.age / pt.maxAge;
       const alpha = lifeRatio < 0.1
-        ? p.map(lifeRatio, 0, 0.1, 0, 180)
+        ? p.map(lifeRatio, 0, 0.1, 0, 178)
         : lifeRatio > 0.85
-          ? p.map(lifeRatio, 0.85, 1, 180, 0)
-          : 180;
+          ? p.map(lifeRatio, 0.85, 1, 178, 0)
+          : 178;
 
-      // Pick stroke color per particle — base from colorIdx, then audio overrides
-      let [r, g, b] = pt.colorIdx === 0
-        ? PALETTE.dark
-        : pt.colorIdx === 1
-          ? PALETTE.gray
-          : PALETTE.accent;
+      // Trail pass.
+      frameBuffer.stroke(PALETTE.accent[0], PALETTE.accent[1], PALETTE.accent[2], 20);
+      frameBuffer.strokeWeight((pt.colorIdx === 0 ? 1.2 : 0.8) * 2.0);
+      frameBuffer.line(pt.px, pt.py, pt.x, pt.y);
 
-      // BASS pushes color toward accent
-      if (bassImpact > 0.5) [r, g, b] = PALETTE.accent;
-      // SNARE overrides to dark (higher priority)
-      if (snareImpact > 0.3) [r, g, b] = PALETTE.dark;
-
-      frameBuffer.stroke(r, g, b, alpha);
+      // Main particle pass.
+      frameBuffer.stroke(PALETTE.accent[0], PALETTE.accent[1], PALETTE.accent[2], alpha);
       frameBuffer.strokeWeight(pt.colorIdx === 0 ? 1.2 : 0.8);
       frameBuffer.line(pt.px, pt.py, pt.x, pt.y);
+      frameBuffer.noStroke();
+      frameBuffer.fill(PALETTE.text[0], PALETTE.text[1], PALETTE.text[2], 153);
+      frameBuffer.circle(pt.x, pt.y, 1.4);
 
       // Respawn if out of bounds or too old
       if (
@@ -235,7 +231,7 @@ export const placeholderSketch2 = (p: any) => {
 
     // Subtle corner labels / decoration — tiny crosshair marks at key points
     p.noFill();
-    p.stroke(PALETTE.dark[0], PALETTE.dark[1], PALETTE.dark[2], 40);
+    p.stroke(PALETTE.muted[0], PALETTE.muted[1], PALETTE.muted[2], 204);
     p.strokeWeight(0.8);
     [[10, 10], [p.width - 10, 10], [10, p.height - 10], [p.width - 10, p.height - 10]].forEach(([cx, cy]) => {
       p.line(cx - 5, cy, cx + 5, cy);
