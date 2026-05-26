@@ -13,7 +13,7 @@ import {
 } from "../lib/audio";
 import { P5Wrapper } from "./P5Wrapper";
 import Knob from "./Knob";
-import { resonantTopologySketch } from "../sketches/resonantTopology";
+import { deepScanSketch } from "../sketches/deepScan";
 
 // ── Track constants ───────────────────────────────────────────────────────────
 const INSTRUMENTS = ["KICK", "SNARE", "HIHAT", "CLAP"];
@@ -563,7 +563,7 @@ export const DrumMachine = () => {
 
         {/* Vis canvas — fills remaining space */}
         <div className="flex-1 relative overflow-hidden min-h-0">
-          <P5Wrapper sketch={resonantTopologySketch} className="w-full h-full absolute inset-0" />
+          <P5Wrapper sketch={deepScanSketch} className="w-full h-full absolute inset-0" />
         </div>
 
         {/* CTA prompt — bottom of right panel */}
