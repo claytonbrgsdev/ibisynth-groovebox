@@ -1,12 +1,13 @@
 import { getAudioTime, visualEvents } from '../lib/audio';
 
-// CITY SCAN v3
-// LiDAR-aesthetic point-cloud city with cinematic camera + rich audio reactivity.
-//   - 32 buildings across 4 archetypes (rect / setback / cylinder / slab)
-//   - Lit windows on faces (drawn cheaply; halos only on events)
-//   - Cinematic camera: ambient sway + dolly/shake/roll on audio
-//   - Audio: building flashes, ground ripple, scan plane, skywalks, snare-ring,
-//     rooftop flicker, city duck
+// CITY SCAN v4
+// LiDAR-aesthetic point-cloud city.
+//   - 18 buildings, cleaner per-building detail
+//   - Cursor-driven camera: mouse position offsets rotation + tilt
+//     on top of continuous ambient drift
+//   - Audio: building flashes, ground ripple, scan plane,
+//     skywalks, snare-ring, rooftop flicker, city duck
+//     (no camera shake/dolly/roll — camera belongs to the cursor)
 
 const PALETTE = {
   bg:     [6, 10, 20]      as const,
@@ -20,8 +21,8 @@ const PALETTE = {
 
 const FLOOR_GRID     = 14;
 const FLOOR_SIZE     = 8;
-const BUILDING_COUNT = 32;
-const BASE_CAM_Z     = 8;
+const BUILDING_COUNT = 18;
+const CAM_Z          = 8;
 const FOV            = 460;
 const BASE_CAM_TILT  = 0.42;
 
@@ -33,58 +34,45 @@ export const cityScanSketch = (p: any) => {
   type Pt = {
     x: number; y: number; z: number;
     brightness: number;
-    kind: 0 | 1;  // 0 = normal, 1 = lit window (brighter + halo on events)
+    kind: 0 | 1;
   };
 
   type Building = {
     cx: number;
     cz: number;
-    w:  number;
-    d:  number;
-    h:  number;
+    w: number;
+    d: number;
+    h: number;
     type: BuildingType;
     tint: Tint;
     points: Pt[];
-    flash: number;        // 0-1
-    flicker: number;      // 0-1 (HIHAT random flicker)
-    duck: number;         // 0-1 (SNARE city ducks)
-    tallRoofXZ: { x: number; y: number; z: number } | null; // for skywalk endpoints (only tall buildings)
+    flash: number;
+    flicker: number;
+    duck: number;
+    tallRoofXZ: { x: number; y: number; z: number } | null;
   };
 
   let buildings: Building[] = [];
   let floorPoints: Pt[]     = [];
 
   // ── Camera state ──────────────────────────────────────────────────────
-  let rotY      = 0.4;
-  let rotYVel   = 0.0028;
-  let camDolly  = 0;        // 0-1, brief zoom-in
-  let camShakeX = 0;
-  let camShakeY = 0;
-  let camRoll   = 0;        // radians, brief tilt
-  const swayPhase = { v: 0 };  // continuous
-
-  let dragging  = false;
-  let dragLastX = 0;
+  let ambientRotY     = 0.4;     // always slowly increments
+  let mouseOffsetRot  = 0;       // smoothed offset from cursor X
+  let mouseOffsetTilt = 0;       // smoothed offset from cursor Y
 
   // ── Audio envelopes ───────────────────────────────────────────────────
-  let bassPulse    = 0;
-  let groundPulse  = 0;       // ground ripple
-  let dubGlow      = 0;
-  let flashAmount  = 0;
-
-  // Scan plane Y in world space
-  let scanPlaneY = 99;
+  let bassPulse   = 0;
+  let groundPulse = 0;
+  let dubGlow     = 0;
+  let flashAmount = 0;
+  let scanPlaneY  = 99;
   const SCAN_SPEED = 0.06;
-
-  // Snare floor ring
-  let snareRing = { active: false, radius: 0, life: 0 };
-
-  // CLAP skywalk lines (active for ~30 frames)
-  let skywalk = { active: false, life: 0, pairs: [] as { a: Building; b: Building }[] };
+  let snareRing   = { active: false, radius: 0, life: 0 };
+  let skywalk     = { active: false, life: 0, pairs: [] as { a: Building; b: Building }[] };
 
   let firstFrame = true;
 
-  // ── Helpers ───────────────────────────────────────────────────────────
+  // ── Geometry helpers ──────────────────────────────────────────────────
   function addPillar(pts: Pt[], x: number, z: number, yTop: number, yBot: number, density = 10) {
     const samples = Math.max(4, Math.floor(Math.abs(yBot - yTop) * density));
     for (let i = 0; i <= samples; i++) {
@@ -97,11 +85,9 @@ export const cityScanSketch = (p: any) => {
     for (let s = 1; s < samples; s++) {
       const t = s / samples;
       pts.push({
-        x: x1 + (x2 - x1) * t,
-        y,
+        x: x1 + (x2 - x1) * t, y,
         z: z1 + (z2 - z1) * t,
-        brightness,
-        kind: 0,
+        brightness, kind: 0,
       });
     }
   }
@@ -120,7 +106,7 @@ export const cityScanSketch = (p: any) => {
           x: a.x + (b.x - a.x) * u,
           y: yTop + v * h,
           z: a.z + (b.z - a.z) * u,
-          brightness: 0.28 + Math.random() * 0.22,
+          brightness: 0.26 + Math.random() * 0.20,
           kind: 0,
         });
       }
@@ -134,8 +120,7 @@ export const cityScanSketch = (p: any) => {
     const rows = Math.max(3, Math.floor(height * 6));
     for (let i = 1; i < cols; i++) {
       for (let j = 1; j < rows; j++) {
-        const lit = Math.random() < litChance;
-        if (!lit) continue; // skip dim window pos for perf — only render lit ones
+        if (Math.random() >= litChance) continue;
         const u = i / cols;
         const v = j / rows;
         pts.push({
@@ -169,9 +154,9 @@ export const cityScanSketch = (p: any) => {
       addEdge(pts, a.x, a.z, bb.x, bb.z, top, 0.9, 8);
       addEdge(pts, a.x, a.z, bb.x, bb.z, bot, 0.55, 6);
     }
-    addFaceDots(pts, corners, top, bot, 8);
-    // sparse top
-    const topDots = Math.floor(b.w * b.d * 8);
+    addFaceDots(pts, corners, top, bot, 5);
+
+    const topDots = Math.floor(b.w * b.d * 6);
     for (let i = 0; i < topDots; i++) {
       pts.push({
         x: b.cx - hw + Math.random() * b.w,
@@ -181,12 +166,15 @@ export const cityScanSketch = (p: any) => {
         kind: 0,
       });
     }
+
     for (let i = 0; i < 4; i++) {
       const a = corners[i];
       const bb = corners[(i + 1) % 4];
-      addWindows(pts, a.x, a.z, bb.x, bb.z, top, bot, 0.18);
+      addWindows(pts, a.x, a.z, bb.x, bb.z, top, bot, 0.10);
     }
-    if (b.h > 1.6) {
+
+    // Antenna only on the very tallest
+    if (b.h > 2.0) {
       const antH = b.h * 0.35;
       const samples = 9;
       for (let i = 0; i <= samples; i++) {
@@ -195,7 +183,10 @@ export const cityScanSketch = (p: any) => {
       }
       pts.push({ x: b.cx, y: top - antH, z: b.cz, brightness: 1, kind: 1 });
       b.tallRoofXZ = { x: b.cx, y: top, z: b.cz };
+    } else if (b.h > 1.4) {
+      b.tallRoofXZ = { x: b.cx, y: top, z: b.cz };
     }
+
     b.points = pts;
   }
 
@@ -205,11 +196,11 @@ export const cityScanSketch = (p: any) => {
     let curW = b.w;
     let curD = b.d;
     let curY = 0;
-    const tierHeight = b.h / tiers;
+    const tierH = b.h / tiers;
     for (let t = 0; t < tiers; t++) {
       const hw = curW / 2;
       const hd = curD / 2;
-      const yTop = curY - tierHeight;
+      const yTop = curY - tierH;
       const yBot = curY;
       const corners = [
         { x: b.cx - hw, z: b.cz - hd },
@@ -224,21 +215,20 @@ export const cityScanSketch = (p: any) => {
         addEdge(pts, a.x, a.z, bb.x, bb.z, yTop, 0.9, 7);
         addEdge(pts, a.x, a.z, bb.x, bb.z, yBot, 0.65, 5);
       }
-      addFaceDots(pts, corners, yTop, yBot, 7);
+      addFaceDots(pts, corners, yTop, yBot, 5);
       for (let i = 0; i < 4; i++) {
         const a = corners[i];
         const bb = corners[(i + 1) % 4];
-        addWindows(pts, a.x, a.z, bb.x, bb.z, yTop, yBot, 0.18);
+        addWindows(pts, a.x, a.z, bb.x, bb.z, yTop, yBot, 0.10);
       }
       curW *= 0.72;
       curD *= 0.72;
       curY = yTop;
     }
-    // top face dots
     {
       const hw = curW / 2;
       const hd = curD / 2;
-      const topDots = Math.floor(curW * curD * 10);
+      const topDots = Math.floor(curW * curD * 8);
       for (let i = 0; i < topDots; i++) {
         pts.push({
           x: b.cx - hw + Math.random() * curW,
@@ -249,7 +239,7 @@ export const cityScanSketch = (p: any) => {
         });
       }
     }
-    // antenna
+    // setbacks always get antenna (they're tall by definition)
     const antH = b.h * 0.35;
     const samples = 10;
     for (let i = 0; i <= samples; i++) {
@@ -258,6 +248,7 @@ export const cityScanSketch = (p: any) => {
     }
     pts.push({ x: b.cx, y: curY - antH, z: b.cz, brightness: 1, kind: 1 });
     b.tallRoofXZ = { x: b.cx, y: curY, z: b.cz };
+
     b.points = pts;
   }
 
@@ -273,7 +264,7 @@ export const cityScanSketch = (p: any) => {
       const z = b.cz + Math.sin(a) * r;
       addPillar(pts, x, z, top, bot, 9);
     }
-    const ringSamples = 36;
+    const ringSamples = 28;
     for (let i = 0; i < ringSamples; i++) {
       const a = (i / ringSamples) * Math.PI * 2;
       const x = b.cx + Math.cos(a) * r;
@@ -281,8 +272,7 @@ export const cityScanSketch = (p: any) => {
       pts.push({ x, y: top, z, brightness: 0.9, kind: 0 });
       pts.push({ x, y: bot, z, brightness: 0.55, kind: 0 });
     }
-    // skin dots
-    const skinDots = Math.floor(b.h * r * 25);
+    const skinDots = Math.floor(b.h * r * 15);
     for (let i = 0; i < skinDots; i++) {
       const a = Math.random() * Math.PI * 2;
       const y = top + Math.random() * b.h;
@@ -290,15 +280,13 @@ export const cityScanSketch = (p: any) => {
         x: b.cx + Math.cos(a) * r,
         y,
         z: b.cz + Math.sin(a) * r,
-        brightness: 0.3 + Math.random() * 0.2,
+        brightness: 0.28 + Math.random() * 0.2,
         kind: 0,
       });
     }
-    // windows
-    const windowCount = Math.floor(b.h * r * 8);
+    const windowCount = Math.floor(b.h * r * 5);
     for (let i = 0; i < windowCount; i++) {
-      const lit = Math.random() < 0.22;
-      if (!lit) continue;
+      if (Math.random() >= 0.18) continue;
       const a = Math.random() * Math.PI * 2;
       const y = top + Math.random() * b.h;
       pts.push({
@@ -309,8 +297,7 @@ export const cityScanSketch = (p: any) => {
         kind: 1,
       });
     }
-    // top face sparse
-    const topDots = Math.floor(r * r * 40);
+    const topDots = Math.floor(r * r * 30);
     for (let i = 0; i < topDots; i++) {
       const a = Math.random() * Math.PI * 2;
       const rr = Math.random() * r;
@@ -328,19 +315,21 @@ export const cityScanSketch = (p: any) => {
 
   function buildSlab(b: Building) {
     buildRect(b);
-    // Helipad ring on top
-    const top = -b.h;
-    const helipadR = Math.min(b.w, b.d) * 0.28;
-    const helipadSamples = 14;
-    for (let i = 0; i < helipadSamples; i++) {
-      const a = (i / helipadSamples) * Math.PI * 2;
-      b.points.push({
-        x: b.cx + Math.cos(a) * helipadR,
-        y: top - 0.01,
-        z: b.cz + Math.sin(a) * helipadR,
-        brightness: 1,
-        kind: 1,
-      });
+    // Helipad only on the wider slabs
+    if (b.w > 1.0 && b.d > 1.0) {
+      const top = -b.h;
+      const helipadR = Math.min(b.w, b.d) * 0.25;
+      const samples = 12;
+      for (let i = 0; i < samples; i++) {
+        const a = (i / samples) * Math.PI * 2;
+        b.points.push({
+          x: b.cx + Math.cos(a) * helipadR,
+          y: top - 0.01,
+          z: b.cz + Math.sin(a) * helipadR,
+          brightness: 1,
+          kind: 1,
+        });
+      }
     }
   }
 
@@ -355,7 +344,7 @@ export const cityScanSketch = (p: any) => {
 
   function pickType(): BuildingType {
     const r = Math.random();
-    if (r < 0.45) return 'rect';
+    if (r < 0.40) return 'rect';
     if (r < 0.70) return 'setback';
     if (r < 0.85) return 'cylinder';
     return 'slab';
@@ -372,47 +361,42 @@ export const cityScanSketch = (p: any) => {
     buildings = [];
     const placed: { cx: number; cz: number; w: number; d: number }[] = [];
     let attempts = 0;
-    while (buildings.length < BUILDING_COUNT && attempts < 2000) {
+    while (buildings.length < BUILDING_COUNT && attempts < 1500) {
       attempts++;
       const type = pickType();
       let w: number, d: number, h: number;
       if (type === 'slab') {
-        w = 0.9 + Math.random() * 0.6;
-        d = 0.9 + Math.random() * 0.6;
+        w = 0.9 + Math.random() * 0.7;
+        d = 0.9 + Math.random() * 0.7;
         h = 0.4 + Math.random() * 0.5;
       } else if (type === 'cylinder') {
-        const r = 0.3 + Math.random() * 0.35;
+        const r = 0.32 + Math.random() * 0.35;
         w = d = r * 2;
-        h = 0.8 + Math.random() ** 1.3 * 2.0;
+        h = 0.9 + Math.random() ** 1.2 * 2.0;
       } else if (type === 'setback') {
-        w = 0.55 + Math.random() * 0.5;
-        d = 0.55 + Math.random() * 0.5;
-        h = 1.5 + Math.random() ** 1.3 * 1.6;
+        w = 0.6 + Math.random() * 0.5;
+        d = 0.6 + Math.random() * 0.5;
+        h = 1.6 + Math.random() ** 1.3 * 1.6;
       } else {
-        w = 0.35 + Math.random() * 0.7;
-        d = 0.35 + Math.random() * 0.7;
-        h = 0.6 + Math.random() ** 1.4 * 2.4;
+        w = 0.4 + Math.random() * 0.7;
+        d = 0.4 + Math.random() * 0.7;
+        h = 0.6 + Math.random() ** 1.3 * 2.4;
       }
       const cx = -FLOOR_SIZE / 2 + Math.random() * FLOOR_SIZE;
       const cz = -FLOOR_SIZE / 2 + Math.random() * FLOOR_SIZE;
       let overlap = false;
       for (const pl of placed) {
-        const minDx = (w + pl.w) / 2 + 0.15;
-        const minDz = (d + pl.d) / 2 + 0.15;
+        const minDx = (w + pl.w) / 2 + 0.30;  // wider gaps for cleaner spacing
+        const minDz = (d + pl.d) / 2 + 0.30;
         if (Math.abs(cx - pl.cx) < minDx && Math.abs(cz - pl.cz) < minDz) {
           overlap = true; break;
         }
       }
       if (overlap) continue;
       const b: Building = {
-        cx, cz, w, d, h,
-        type,
+        cx, cz, w, d, h, type,
         tint: pickTint(),
-        points: [],
-        flash: 0,
-        flicker: 0,
-        duck: 0,
-        tallRoofXZ: null,
+        points: [], flash: 0, flicker: 0, duck: 0, tallRoofXZ: null,
       };
       buildPoints(b);
       buildings.push(b);
@@ -427,17 +411,13 @@ export const cityScanSketch = (p: any) => {
     for (let i = 0; i <= FLOOR_GRID; i++) {
       for (let j = 0; j <= FLOOR_GRID; j++) {
         floorPoints.push({
-          x: -half + i * step,
-          y: 0,
-          z: -half + j * step,
-          brightness: 0.55,
-          kind: 0,
+          x: -half + i * step, y: 0, z: -half + j * step,
+          brightness: 0.55, kind: 0,
         });
       }
     }
   }
 
-  // Find nearest-neighbor pairs of tall buildings for skywalks
   function makeSkywalkPairs(): { a: Building; b: Building }[] {
     const tall = buildings.filter(b => b.tallRoofXZ !== null);
     if (tall.length < 2) return [];
@@ -454,7 +434,6 @@ export const cityScanSketch = (p: any) => {
       }
       if (best && bestD < 3.5) pairs.push({ a: tall[i], b: best, d: bestD });
     }
-    // dedupe pairs
     const seen = new Set<string>();
     const out: { a: Building; b: Building }[] = [];
     for (const pr of pairs) {
@@ -490,47 +469,24 @@ export const cityScanSketch = (p: any) => {
     }
   };
 
-  p.mousePressed = () => {
-    if (p.mouseX > 0 && p.mouseX < p.width && p.mouseY > 0 && p.mouseY < p.height) {
-      dragging  = true;
-      dragLastX = p.mouseX;
-    }
-  };
-  p.mouseReleased = () => { dragging = false; };
-
-  // ── 3D project ────────────────────────────────────────────────────────
-  function project(wx: number, wy: number, wz: number, cx: number, cy: number, viewportFactor: number, dynZ: number, dynTilt: number) {
+  // ── 3D projection ─────────────────────────────────────────────────────
+  function project(wx: number, wy: number, wz: number, cx: number, cy: number, viewportFactor: number, rotY: number, tilt: number) {
     const cosY = Math.cos(rotY);
     const sinY = Math.sin(rotY);
     const x1 = wx * cosY - wz * sinY;
     const z1 = wx * sinY + wz * cosY;
-
-    const cosT = Math.cos(dynTilt);
-    const sinT = Math.sin(dynTilt);
+    const cosT = Math.cos(tilt);
+    const sinT = Math.sin(tilt);
     const y1 = wy * cosT - z1 * sinT;
     const z2 = wy * sinT + z1 * cosT;
-
     const yLifted = y1 - 0.2;
-    const dist = dynZ - z2;
+    const dist = CAM_Z - z2;
     if (dist <= 0.1) return null;
     const f = (FOV * viewportFactor) / dist;
-
-    // Apply camera roll (2D rotation on screen)
-    let sx = x1 * f;
-    let sy = yLifted * f;
-    if (Math.abs(camRoll) > 0.001) {
-      const cr = Math.cos(camRoll);
-      const sr = Math.sin(camRoll);
-      const sx2 = sx * cr - sy * sr;
-      const sy2 = sx * sr + sy * cr;
-      sx = sx2; sy = sy2;
-    }
-
     return {
-      sx: cx + sx + camShakeX,
-      sy: cy + sy + camShakeY,
-      depth: z2,
-      f,
+      sx: cx + x1 * f,
+      sy: cy + yLifted * f,
+      depth: z2, f,
     };
   }
 
@@ -538,17 +494,13 @@ export const cityScanSketch = (p: any) => {
     const t = Math.max(0, Math.min(1, (depth + 3.5) / 7));
     let nearC: readonly [number, number, number] = PALETTE.accent;
     let farC:  readonly [number, number, number] = PALETTE.far;
-    if (tint === 'warm') { nearC = PALETTE.warm; }
-    if (tint === 'cool') { farC = PALETTE.cool; }
+    if (tint === 'warm') nearC = PALETTE.warm;
+    if (tint === 'cool') farC = PALETTE.cool;
     const r = farC[0] + (nearC[0] - farC[0]) * t;
     const g = farC[1] + (nearC[1] - farC[1]) * t;
     const b = farC[2] + (nearC[2] - farC[2]) * t;
     const fogAtt = 0.4 + t * 0.6;
-    const baseAlpha = 220;
-    const alpha = baseAlpha * brightness * fogAtt
-                + flashAmount * 90
-                + dubGlow * 50
-                + hit * 100;
+    const alpha = 220 * brightness * fogAtt + flashAmount * 90 + dubGlow * 50 + hit * 100;
     return { r, g, b, a: Math.min(255, alpha) };
   }
 
@@ -566,12 +518,10 @@ export const cityScanSketch = (p: any) => {
       if (now >= ev.time) {
         switch (ev.type) {
           case 'KICK': {
-            for (let k = 0; k < 4; k++) {
+            for (let k = 0; k < 3; k++) {
               const idx = Math.floor(Math.random() * buildings.length);
               buildings[idx].flash = 1;
             }
-            camShakeX += (Math.random() - 0.5) * 4;
-            camShakeY += (Math.random() - 0.5) * 4;
             break;
           }
           case 'BASS':
@@ -579,8 +529,7 @@ export const cityScanSketch = (p: any) => {
             groundPulse = 1;
             break;
           case 'HIHAT': {
-            // Trigger flicker on a few random buildings
-            for (let k = 0; k < 5; k++) {
+            for (let k = 0; k < 4; k++) {
               const idx = Math.floor(Math.random() * buildings.length);
               buildings[idx].flicker = 1;
             }
@@ -589,18 +538,13 @@ export const cityScanSketch = (p: any) => {
           case 'DUB':
             dubGlow    = 1;
             scanPlaneY = -3.5;
-            rotYVel    = 0.014;
-            camDolly  += 0.6;
             break;
           case 'SNARE':
             snareRing = { active: true, radius: 0, life: 1 };
-            // City ducks: all buildings briefly drop height
             for (const b of buildings) b.duck = 1;
-            camRoll += (Math.random() - 0.5) * 0.04;
             break;
           case 'CLAP':
             flashAmount = 1;
-            // Skywalks
             skywalk = { active: true, life: 1, pairs: makeSkywalkPairs() };
             break;
         }
@@ -608,50 +552,42 @@ export const cityScanSketch = (p: any) => {
       }
     }
 
-    // ── Decay envelopes & camera ────────────────────────────────────────
+    // ── Decay envelopes ─────────────────────────────────────────────────
     bassPulse   *= 0.92;
     groundPulse *= 0.93;
     dubGlow     *= 0.94;
     flashAmount *= 0.88;
-    camShakeX   *= 0.82;
-    camShakeY   *= 0.82;
-    camRoll     *= 0.90;
-    camDolly    *= 0.92;
-    rotYVel      = p.lerp(rotYVel, 0.0028, 0.05);
-    rotY        += rotYVel;
-    swayPhase.v += 0.006;
-
     for (const b of buildings) {
-      b.flash  *= 0.91;
+      b.flash   *= 0.91;
       b.flicker *= 0.82;
-      b.duck   *= 0.86;
+      b.duck    *= 0.86;
     }
-
     if (scanPlaneY < 1) scanPlaneY += SCAN_SPEED;
-
     if (snareRing.active) {
       snareRing.radius += 0.13;
       snareRing.life   *= 0.94;
       if (snareRing.life < 0.05) snareRing.active = false;
     }
-
     if (skywalk.active) {
       skywalk.life *= 0.94;
       if (skywalk.life < 0.05) skywalk.active = false;
     }
 
-    if (dragging && p.mouseIsPressed) {
-      const dx = p.mouseX - dragLastX;
-      rotY += dx * 0.008;
-      dragLastX = p.mouseX;
-    } else if (!p.mouseIsPressed) {
-      dragging = false;
-    }
+    // ── Camera (cursor-driven) ──────────────────────────────────────────
+    ambientRotY += 0.0022;  // continuous slow drift
 
-    // Dynamic camera params
-    const dynCamZ   = BASE_CAM_Z - camDolly * 1.6;
-    const tiltSway  = Math.sin(swayPhase.v) * 0.03;
-    const dynTilt   = BASE_CAM_TILT + tiltSway;
+    const inBounds = p.mouseX >= 0 && p.mouseX <= p.width && p.mouseY >= 0 && p.mouseY <= p.height;
+    if (inBounds) {
+      const mxNorm = (p.mouseX - p.width / 2) / (p.width / 2);    // -1..1
+      const myNorm = (p.mouseY - p.height / 2) / (p.height / 2);  // -1..1
+      mouseOffsetRot  = p.lerp(mouseOffsetRot,  mxNorm * 0.9, 0.06);
+      mouseOffsetTilt = p.lerp(mouseOffsetTilt, myNorm * 0.22, 0.06);
+    } else {
+      mouseOffsetRot  = p.lerp(mouseOffsetRot,  0, 0.04);
+      mouseOffsetTilt = p.lerp(mouseOffsetTilt, 0, 0.04);
+    }
+    const rotY    = ambientRotY + mouseOffsetRot;
+    const dynTilt = BASE_CAM_TILT + mouseOffsetTilt;
 
     // ── BG fade ─────────────────────────────────────────────────────────
     if (firstFrame) {
@@ -662,30 +598,25 @@ export const cityScanSketch = (p: any) => {
     p.fill(PALETTE.bg[0], PALETTE.bg[1], PALETTE.bg[2], 42);
     p.rect(0, 0, p.width, p.height);
 
-    // ── Floor points (with ground ripple from BASS) ─────────────────────
+    // ── Floor points ────────────────────────────────────────────────────
     p.noStroke();
     for (let i = 0; i < floorPoints.length; i++) {
       const fp = floorPoints[i];
-      const proj = project(fp.x, fp.y, fp.z, cx, cy, viewportFactor, dynCamZ, dynTilt);
+      const proj = project(fp.x, fp.y, fp.z, cx, cy, viewportFactor, rotY, dynTilt);
       if (!proj) continue;
 
-      // Snare ring boost
       let ringBoost = 0;
       if (snareRing.active) {
         const distToRing = Math.abs(Math.sqrt(fp.x * fp.x + fp.z * fp.z) - snareRing.radius);
         if (distToRing < 0.35) ringBoost = (1 - distToRing / 0.35) * snareRing.life;
       }
-
-      // Ground pulse: brightness wave radiating outward
       let groundBoost = 0;
       if (groundPulse > 0.05) {
         const radial = Math.sqrt(fp.x * fp.x + fp.z * fp.z);
-        // moving wave: front travels outward over time, sin-shaped
-        const front = (1 - groundPulse) * 5;  // 0 at peak, 5 at decay end
+        const front = (1 - groundPulse) * 5;
         const dr = Math.abs(radial - front);
         if (dr < 0.5) groundBoost = (1 - dr / 0.5) * groundPulse * 0.8;
       }
-
       const c = colorForDepth(proj.depth, fp.brightness, ringBoost + groundBoost, 'normal');
       const size = Math.max(1.1, proj.f * 0.008 + ringBoost * 2.5 + groundBoost * 1.5);
       p.fill(c.r, c.g, c.b, c.a * 0.85);
@@ -695,43 +626,31 @@ export const cityScanSketch = (p: any) => {
     // ── Buildings ───────────────────────────────────────────────────────
     for (let bi = 0; bi < buildings.length; bi++) {
       const b = buildings[bi];
-
-      // Effective height scale = bass stretch − snare duck
       const effHeightScale = (1 + bassPulse * 0.16) * (1 - b.duck * 0.18);
-
-      // Flicker boosts a portion of windows briefly
       const flickerActive = b.flicker > 0.1;
-      const flickerThreshold = 0.6; // ~40% of windows flicker when active
 
       for (let pi = 0; pi < b.points.length; pi++) {
         const pt = b.points[pi];
         const py = pt.y * effHeightScale;
-        const px = pt.x;
-        const pz = pt.z;
-
-        const proj = project(px, py, pz, cx, cy, viewportFactor, dynCamZ, dynTilt);
+        const proj = project(pt.x, py, pt.z, cx, cy, viewportFactor, rotY, dynTilt);
         if (!proj) continue;
 
-        // Scan plane hit
         let scanHit = 0;
         if (scanPlaneY < 1 && scanPlaneY > -3.5) {
           const dy = Math.abs(py - scanPlaneY);
           if (dy < 0.15) scanHit = (1 - dy / 0.15);
         }
 
-        // Per-point flicker
         let flickerBoost = 0;
-        if (flickerActive && pt.kind === 1 && Math.random() > flickerThreshold) {
+        if (flickerActive && pt.kind === 1 && Math.random() > 0.6) {
           flickerBoost = b.flicker;
         }
 
         const totalHit = b.flash + scanHit * 0.8 + flickerBoost;
         const c = colorForDepth(proj.depth, pt.brightness, totalHit, b.tint);
-
         let size = Math.max(1, proj.f * 0.013 + b.flash * 2.5 + scanHit * 2 + flickerBoost * 1.5);
         if (pt.kind === 1) size *= 1.3;
 
-        // Halo ONLY on event-triggered points (perf win)
         const needHalo = (totalHit > 0.15) || (flashAmount > 0.15 && pt.kind === 1);
         if (needHalo) {
           const haloA = (totalHit * 140 + flashAmount * 70);
@@ -742,7 +661,6 @@ export const cityScanSketch = (p: any) => {
         p.fill(c.r, c.g, c.b, c.a);
         p.circle(proj.sx, proj.sy, size);
 
-        // Bright core: lit windows always, normal points only when near + bright
         if (pt.kind === 1) {
           p.fill(PALETTE.text[0], PALETTE.text[1], PALETTE.text[2], 235);
           p.circle(proj.sx, proj.sy, size * 0.55);
@@ -764,7 +682,7 @@ export const cityScanSketch = (p: any) => {
         const a = (i / ringSamples) * Math.PI * 2;
         const wx = Math.cos(a) * snareRing.radius;
         const wz = Math.sin(a) * snareRing.radius;
-        const proj = project(wx, 0, wz, cx, cy, viewportFactor, dynCamZ, dynTilt);
+        const proj = project(wx, 0, wz, cx, cy, viewportFactor, rotY, dynTilt);
         if (proj && prev) p.line(prev.sx, prev.sy, proj.sx, proj.sy);
         prev = proj;
       }
@@ -777,8 +695,8 @@ export const cityScanSketch = (p: any) => {
       p.strokeWeight(0.9 * skywalk.life);
       for (const pair of skywalk.pairs) {
         if (!pair.a.tallRoofXZ || !pair.b.tallRoofXZ) continue;
-        const pa = project(pair.a.tallRoofXZ.x, pair.a.tallRoofXZ.y, pair.a.tallRoofXZ.z, cx, cy, viewportFactor, dynCamZ, dynTilt);
-        const pb = project(pair.b.tallRoofXZ.x, pair.b.tallRoofXZ.y, pair.b.tallRoofXZ.z, cx, cy, viewportFactor, dynCamZ, dynTilt);
+        const pa = project(pair.a.tallRoofXZ.x, pair.a.tallRoofXZ.y, pair.a.tallRoofXZ.z, cx, cy, viewportFactor, rotY, dynTilt);
+        const pb = project(pair.b.tallRoofXZ.x, pair.b.tallRoofXZ.y, pair.b.tallRoofXZ.z, cx, cy, viewportFactor, rotY, dynTilt);
         if (pa && pb) p.line(pa.sx, pa.sy, pb.sx, pb.sy);
       }
       p.noStroke();
