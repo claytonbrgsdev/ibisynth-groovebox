@@ -101,7 +101,7 @@ const Knob: React.FC<KnobProps> = ({ label, value, onChange, size = 64 }) => {
           cy={cy}
           r={outerR}
           fill="none"
-          stroke="#1B2638"
+          stroke="#3D2E1E"
           strokeWidth={1.5}
         />
 
@@ -109,7 +109,7 @@ const Knob: React.FC<KnobProps> = ({ label, value, onChange, size = 64 }) => {
         <path
           d={trackPath}
           fill="none"
-          stroke="#1B2638"
+          stroke="#3D2E1E"
           strokeWidth={2.5}
           strokeLinecap="round"
         />
@@ -119,7 +119,7 @@ const Knob: React.FC<KnobProps> = ({ label, value, onChange, size = 64 }) => {
           <path
             d={valuePath}
             fill="none"
-            stroke="#00D9FF"
+            stroke="#C89548"
             strokeWidth={2.5}
             strokeLinecap="round"
           />
@@ -130,7 +130,7 @@ const Knob: React.FC<KnobProps> = ({ label, value, onChange, size = 64 }) => {
           cx={cx}
           cy={cy}
           r={innerR}
-          fill="#0C121E"
+          fill="#18110A"
         />
 
         {/* Indicator line */}
@@ -139,7 +139,7 @@ const Knob: React.FC<KnobProps> = ({ label, value, onChange, size = 64 }) => {
           y1={p1.y}
           x2={p2.x}
           y2={p2.y}
-          stroke="#00D9FF"
+          stroke="#C89548"
           strokeWidth={2}
           strokeLinecap="round"
         />

@@ -1,31 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
-/* ── DEEP SCAN palette ── LiDAR / scientific scanner aesthetic ── */
+/* ── ALCHEMICAL palette ── sepia / parchment-shadow / burnished gold ── */
 :root {
-  --ib-bg: #060A14;
-  --ib-text: #DCEFFA;
-  --ib-accent: #00D9FF;
-  --ib-muted: #1B2638;
-  --ib-surface: #0C121E;
-  --ib-accent-dim: rgba(0, 217, 255, 0.18);
-  --ib-text-dim: rgba(220, 239, 250, 0.45);
+  --ib-bg: #0F0A05;
+  --ib-text: #E8DCC4;
+  --ib-accent: #C89548;
+  --ib-muted: #3D2E1E;
+  --ib-surface: #18110A;
+  --ib-accent-dim: rgba(200, 149, 72, 0.18);
+  --ib-text-dim: rgba(232, 220, 196, 0.45);
 }
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Deep Scan system tokens */
-  --color-sys-bg:      #060A14;
-  --color-sys-gray:    #1B2638;
-  --color-sys-dark:    #DCEFFA;
-  --color-sys-surface: #0C121E;
-  --color-sys-magenta: #00D9FF;
-  --color-sys-cyan:    rgba(0, 217, 255, 0.6);
-  --color-sys-volt:    #00D9FF;
-  --color-sys-green:   #1B2638;
-  --color-sys-orange:  #00D9FF;
+  /* Alchemical system tokens */
+  --color-sys-bg:      #0F0A05;
+  --color-sys-gray:    #3D2E1E;
+  --color-sys-dark:    #E8DCC4;
+  --color-sys-surface: #18110A;
+  --color-sys-magenta: #C89548;
+  --color-sys-cyan:    rgba(200, 149, 72, 0.6);
+  --color-sys-volt:    #C89548;
+  --color-sys-green:   #3D2E1E;
+  --color-sys-orange:  #C89548;
 }
 
 @layer base {

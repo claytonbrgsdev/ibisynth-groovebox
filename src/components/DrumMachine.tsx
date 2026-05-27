@@ -13,7 +13,7 @@ import {
 } from "../lib/audio";
 import { P5Wrapper } from "./P5Wrapper";
 import Knob from "./Knob";
-import { cityScanSketch } from "../sketches/cityScan";
+import { ouroborosSketch } from "../sketches/ouroboros";
 
 // ── Track constants ───────────────────────────────────────────────────────────
 const INSTRUMENTS = ["KICK", "SNARE", "HIHAT", "CLAP"];
@@ -563,7 +563,7 @@ export const DrumMachine = () => {
 
         {/* Vis canvas — fills remaining space */}
         <div className="flex-1 relative overflow-hidden min-h-0">
-          <P5Wrapper sketch={cityScanSketch} className="w-full h-full absolute inset-0" />
+          <P5Wrapper sketch={ouroborosSketch} className="w-full h-full absolute inset-0" />
         </div>
 
         {/* CTA prompt — bottom of right panel */}
