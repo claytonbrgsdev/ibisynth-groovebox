@@ -13,7 +13,6 @@ import {
 } from "../lib/audio";
 import { P5Wrapper } from "./P5Wrapper";
 import Knob from "./Knob";
-import { ouroborosSketch } from "../sketches/ouroboros";
 
 // ── Track constants ───────────────────────────────────────────────────────────
 const INSTRUMENTS = ["KICK", "SNARE", "HIHAT", "CLAP"];
@@ -62,7 +61,12 @@ function fromIndices(arr: number[][]): boolean[][] {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export const DrumMachine = () => {
+interface DrumMachineProps {
+  /** p5.js instance-mode sketch for the hero visualization */
+  sketch: (p: any) => void;
+}
+
+export const DrumMachine = ({ sketch }: DrumMachineProps) => {
 
   // Sequencer grids
   const [grid, setGrid] = useState<boolean[][]>(() => {
@@ -563,7 +567,7 @@ export const DrumMachine = () => {
 
         {/* Vis canvas — fills remaining space */}
         <div className="flex-1 relative overflow-hidden min-h-0">
-          <P5Wrapper sketch={ouroborosSketch} className="w-full h-full absolute inset-0" />
+          <P5Wrapper sketch={sketch} className="w-full h-full absolute inset-0" />
         </div>
 
         {/* CTA prompt — bottom of right panel */}
